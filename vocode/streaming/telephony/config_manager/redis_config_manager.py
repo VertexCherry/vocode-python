@@ -16,6 +16,8 @@ class RedisConfigManager(BaseConfigManager):
             port=int(os.environ.get("REDISPORT", 6379)),
             db=0,
             decode_responses=True,
+            password=os.environ.get("REDISPASS", None),
+            username=os.environ.get("REDISUSER", None)
         )
         self.logger = logger or logging.getLogger(__name__)
 
