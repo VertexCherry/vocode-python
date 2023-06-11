@@ -18,10 +18,12 @@ class TranscriberType(str, Enum):
     BASE = "transcriber_base"
     DEEPGRAM = "transcriber_deepgram"
     GOOGLE = "transcriber_google"
+    GOOGLE_V2 = "transcriber_google_v2"
     ASSEMBLY_AI = "transcriber_assembly_ai"
     WHISPER_CPP = "transcriber_whisper_cpp"
     REV_AI = "transcriber_rev_ai"
     AZURE = "transcriber_azure"
+    VOSK = "transcriber_vosk"
 
 
 class EndpointingType(str, Enum):
@@ -113,6 +115,11 @@ class GoogleTranscriberConfig(TranscriberConfig, type=TranscriberType.GOOGLE.val
     language_code: str = "en-US"
 
 
+class GoogleV2TranscriberConfig(TranscriberConfig, type=TranscriberType.GOOGLE_V2.value):
+    model: Optional[str] = None
+    language_code: str = "en-US"
+
+
 class AzureTranscriberConfig(TranscriberConfig, type=TranscriberType.AZURE.value):
     pass
 
@@ -133,4 +140,7 @@ class WhisperCPPTranscriberConfig(
 
 
 class RevAITranscriberConfig(TranscriberConfig, type=TranscriberType.REV_AI.value):
+    pass
+
+class VoskTranscriberConfig(TranscriberConfig, type=TranscriberType.VOSK.value):
     pass
