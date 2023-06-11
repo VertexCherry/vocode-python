@@ -216,3 +216,42 @@ class BaseSynthesizer(Generic[SynthesizerConfigType]):
                 message, seconds, len(output_bytes)
             ),
         )
+
+    def create_synthesis_result_from_streaming_mp3(
+        self, audio_generator: Generator[bytes, None, None], message: BaseMessage, chunk_size: int, wpm: int
+    ) -> SynthesisResult:
+        from pydub import AudioSegment
+        from typing import Generator
+
+        if self.synthesizer_config.should_encode_as_wav:
+            chunk_transform = lambda chunk: encode_as_wav(
+                chunk, self.synthesizer_config
+            )
+        else:
+            chunk_transform = lambda chunk: chunk
+        
+        async def chunk_generator(_audio_generator):
+            for mp3_data in _audio_generator:
+                audio_segment = AudioSegment.from_mp3(io.BytesIO(mp3_data))
+                output_bytes = convert_wav(
+                    audio_segment,
+                    output_sample_rate=self.synthesizer_config.sampling_rate,
+                    output_encoding=self.synthesizer_config.audio_encoding,
+                )
+
+                for i in range(0, len(output_bytes), chunk_size):
+                    if i + chunk_size > len(output_bytes):
+                        yield SynthesisResult.ChunkResult(
+                            chunk_transform(output_bytes[i:]), True
+                        )
+                    else:
+                        yield SynthesisResult.ChunkResult(
+                            chunk_transform(output_bytes[i : i + chunk_size]), False
+                        )
+
+        return SynthesisResult(
+            chunk_generator(audio_generator),
+            lambda seconds: self.get_message_cutoff_from_voice_speed(
+                message, seconds, wpm
+            ),
+        )

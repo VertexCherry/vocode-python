@@ -42,6 +42,7 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
         self.similarity_boost = synthesizer_config.similarity_boost
         self.model_id = synthesizer_config.model_id
         self.optimize_streaming_latency = synthesizer_config.optimize_streaming_latency
+        self.streaming = synthesizer_config.streaming
         self.words_per_minute = 150
 
     async def create_speech(
@@ -55,7 +56,8 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
             voice.settings = self.elevenlabs.VoiceSettings(
                 stability=self.stability, similarity_boost=self.similarity_boost
             )
-        url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}"
+        streaming_suffix = "/stream" if self.streaming else ""
+        url = ELEVEN_LABS_BASE_URL + f"text-to-speech/{self.voice_id}{streaming_suffix}"
         if self.optimize_streaming_latency:
             url += f"?optimize_streaming_latency={self.optimize_streaming_latency}"
         headers = {"xi-api-key": self.api_key}
@@ -86,18 +88,19 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 convert_span = tracer.start_span(
                     f"synthesizer.{SynthesizerType.ELEVEN_LABS.value.split('_', 1)[-1]}.convert",
                 )
-                audio_segment: AudioSegment = AudioSegment.from_mp3(
-                    io.BytesIO(audio_data)  # type: ignore
-                )
+                #audio_segment: AudioSegment = AudioSegment.from_mp3(
+                #    io.BytesIO(audio_data)  # type: ignore
+                #)
 
                 output_bytes_io = io.BytesIO()
 
                 audio_segment.export(output_bytes_io, format="wav")  # type: ignore
 
-                result = self.create_synthesis_result_from_wav(
-                    file=output_bytes_io,
+                result = self.create_synthesis_result_from_streaming_mp3(
+                    audio_generator= None, # TODO
                     message=message,
                     chunk_size=chunk_size,
+                    wpm=280
                 )
                 convert_span.end()
 
