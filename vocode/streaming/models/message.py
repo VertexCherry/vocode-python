@@ -2,7 +2,7 @@ from enum import Enum
 from .model import TypedModel
 from enum import EnumMeta
 
-from vocode.streaming.models.audio_segment import AudioSegmentModel
+from vocode.streaming.models.audio_segment import AudioSegment
 
 class MessageType(str, Enum):
     BASE = "message_base"
@@ -20,4 +20,6 @@ class SSMLMessage(BaseMessage, type=MessageType.SSML):
 
 
 class AudioMessage(BaseMessage, type=MessageType.AUDIO):
-    audio: AudioSegmentModel
+    audio: AudioSegment
+    text: str = ""
+

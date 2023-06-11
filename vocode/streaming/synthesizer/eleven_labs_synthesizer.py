@@ -92,16 +92,16 @@ class ElevenLabsSynthesizer(BaseSynthesizer[ElevenLabsSynthesizerConfig]):
                 #    io.BytesIO(audio_data)  # type: ignore
                 #)
 
-                output_bytes_io = io.BytesIO()
-
-                audio_segment.export(output_bytes_io, format="wav")  # type: ignore
-
-                result = self.create_synthesis_result_from_streaming_mp3(
-                    audio_generator= None, # TODO
-                    message=message,
-                    chunk_size=chunk_size,
-                    wpm=280
-                )
+                #output_bytes_io = io.BytesIO()
+#
+                #audio_segment.export(output_bytes_io, format="wav")  # type: ignore
+#
+                #result = self.create_synthesis_result_from_streaming_mp3(
+                #    audio_generator= None, # TODO
+                #    message=message,
+                #    chunk_size=chunk_size,
+                #    wpm=280
+                #)
                 convert_span.end()
 
-                return result
+                return None #result
