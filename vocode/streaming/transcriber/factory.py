@@ -6,7 +6,9 @@ from vocode.streaming.models.transcriber import (
     AzureTranscriberConfig,
     DeepgramTranscriberConfig,
     GoogleTranscriberConfig,
+    GoogleV2TranscriberConfig,
     RevAITranscriberConfig,
+    VoskTranscriberConfig,
     TranscriberConfig,
     TranscriberType,
 )
@@ -15,6 +17,8 @@ from vocode.streaming.transcriber.deepgram_transcriber import DeepgramTranscribe
 from vocode.streaming.transcriber.google_transcriber import GoogleTranscriber
 from vocode.streaming.transcriber.rev_ai_transcriber import RevAITranscriber
 from vocode.streaming.transcriber.azure_transcriber import AzureTranscriber
+from vocode.streaming.transcriber.vosk_transcriber import VoskTranscriber
+from vocode.streaming.transcriber.google_v2_transcriber import GoogleV2Transcriber
 
 
 class TranscriberFactory:
@@ -33,5 +37,9 @@ class TranscriberFactory:
             return RevAITranscriber(transcriber_config, logger=logger)
         elif isinstance(transcriber_config, AzureTranscriberConfig):
             return AzureTranscriber(transcriber_config, logger=logger)
+        elif isinstance(transcriber_config, VoskTranscriberConfig):
+            return VoskTranscriber(transcriber_config, logger=logger)
+        elif isinstance(transcriber_config, GoogleV2TranscriberConfig):
+            return GoogleV2Transcriber(transcriber_config, logger=logger)
         else:
             raise Exception("Invalid transcriber config")
