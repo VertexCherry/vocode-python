@@ -1,8 +1,10 @@
 from __future__ import annotations
+import array
 
 import asyncio
 import queue
 import random
+import tempfile
 import threading
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar
 import logging
@@ -11,13 +13,14 @@ import typing
 
 from vocode.streaming.action.worker import ActionsWorker
 from vocode.streaming.agent.action_agent import ActionAgent
-
+import pydub
 from vocode.streaming.agent.bot_sentiment_analyser import (
     BotSentimentAnalyser,
 )
+from vocode.streaming.models.audio_encoding import AudioEncoding
 from vocode.streaming.models.actions import ActionInput
 from vocode.streaming.models.transcript import Transcript, TranscriptCompleteEvent
-from vocode.streaming.models.message import BaseMessage
+from vocode.streaming.models.message import AudioClipMessage, BaseMessage
 from vocode.streaming.models.transcriber import TranscriberConfig
 from vocode.streaming.output_device.base_output_device import BaseOutputDevice
 from vocode.streaming.utils.events_manager import EventsManager
@@ -280,12 +283,19 @@ class StreamingConversation(Generic[OutputDeviceType]):
         ):
             try:
                 message, synthesis_result = item.payload
-                message_sent, cut_off = await self.conversation.send_speech_to_output(
-                    message.text,
-                    synthesis_result,
-                    item.interruption_event,
-                    TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
-                )
+                if isinstance(message, AudioClipMessage):
+                    message_sent, cut_off = await self.conversation.send_audio_to_output(
+                        message.text,
+                        message.audio_clip,
+                        TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
+                    )
+                else:
+                    message_sent, cut_off = await self.conversation.send_speech_to_output(
+                        message.text,
+                        synthesis_result,
+                        item.interruption_event,
+                        TEXT_TO_SPEECH_CHUNK_SIZE_SECONDS,
+                    )
                 self.conversation.logger.debug("Message sent: {}".format(message_sent))
                 if cut_off:
                     self.conversation.agent.update_last_bot_message_on_cut_off(
@@ -555,6 +565,88 @@ class StreamingConversation(Generic[OutputDeviceType]):
             self.logger.debug("Unmuting transcriber")
             self.transcriber.unmute()
         return message_sent, cut_off
+
+    async def send_audio_to_output(
+        self,
+        placeholder_text: str,
+        audio: str,
+        seconds_per_chunk: int,
+        started_event: Optional[threading.Event] = None,
+    ):
+        """
+        - Sends the speech chunk by chunk to the output device
+
+        Returns the placeholder text for the audio that was sent
+        """
+        if self.transcriber.get_transcriber_config().mute_during_speech:
+            self.logger.debug("Muting transcriber")
+            self.transcriber.mute()
+            
+        message_sent = f'[{placeholder_text}]'
+
+        chunk_size = seconds_per_chunk * get_chunk_size_per_second(
+            self.synthesizer.get_synthesizer_config().audio_encoding,
+            self.synthesizer.get_synthesizer_config().sampling_rate,
+        )
+
+        async def chunk_generator(x):
+            synth_config = self.synthesizer.get_synthesizer_config()
+            params = ["-ar",f"{synth_config.sampling_rate}"]
+            
+            #audio = None
+            #if (synth_config.audio_encoding == AudioEncoding.MULAW):
+            #    audio = pydub.AudioSegment.from_file(x, format="mulaw")
+            #else:
+            audio = pydub.AudioSegment.from_file(x)
+            audio = audio.set_frame_rate(synth_config.sampling_rate)
+            
+            toFile = tempfile.TemporaryFile()
+            audio.export(toFile, format="mulaw")
+            toFile.seek(0)
+            data = toFile.read()
+                
+            data_len = len(data)
+            for i in range(0, data_len, chunk_size):
+                if i + chunk_size > data_len:
+                    yield SynthesisResult.ChunkResult(
+                        data[i:], True
+                    )
+                else:
+                    yield SynthesisResult.ChunkResult(
+                        data[i:i + chunk_size], False
+                    )
+
+
+        chunk_idx = 0
+        async for chunk_result in chunk_generator(audio):
+            start_time = time.time()
+            speech_length_seconds = seconds_per_chunk * (
+                len(chunk_result.chunk) / chunk_size
+            )
+            if chunk_idx == 0:
+                if started_event:
+                    started_event.set()
+            self.output_device.consume_nonblocking(chunk_result.chunk)
+            end_time = time.time()
+            await asyncio.sleep(
+                max(
+                    speech_length_seconds
+                    - (end_time - start_time)
+                    - self.per_chunk_allowance_seconds,
+                    0,
+                )
+            )
+            self.logger.debug(
+                "Sent chunk {} with size {}".format(chunk_idx, len(chunk_result.chunk))
+            )
+            self.mark_last_action_timestamp()
+            chunk_idx += 1
+
+        if self.transcriber.get_transcriber_config().mute_during_speech:
+            self.logger.debug("Unmuting transcriber")
+            self.transcriber.unmute()
+
+        return message_sent, False
 
     def mark_terminated(self):
         self.active = False

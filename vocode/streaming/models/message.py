@@ -1,14 +1,12 @@
 from enum import Enum
 from .model import TypedModel
 from enum import EnumMeta
-
-from vocode.streaming.models.audio_segment import AudioSegment
+from typing import Optional
 
 class MessageType(str, Enum):
     BASE = "message_base"
     SSML = "message_ssml"
-    AUDIO = "message_audio"
-
+    AUDIO_CLIP = "message_audio_clip"
 
 
 class BaseMessage(TypedModel, type=MessageType.BASE):
@@ -19,7 +17,6 @@ class SSMLMessage(BaseMessage, type=MessageType.SSML):
     ssml: str
 
 
-class AudioMessage(BaseMessage, type=MessageType.AUDIO):
-    audio: AudioSegment
-    text: str = ""
+class AudioClipMessage(BaseMessage, type=MessageType.AUDIO_CLIP):
+    audio_clip: str
 
